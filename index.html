@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Notion Timer Widget (300x300) • v7</title>
+
+  <style>
+    :root{
+      --tileW:300px; --tileH:300px;
+
+      /* LIGHT */
+      --card:#ffffff; --card2:#fbfbfc;
+      --ink:#121318; --muted:#5c6373; --muted2:#7a8191;
+      --line:rgba(18,19,24,.14);
+
+      --pill:rgba(18,19,24,.06);
+      --pill2:rgba(18,19,24,.10);
+      --fill:rgba(18,19,24,.86);
+
+      --softBar:rgba(18,19,24,.22);
+      --btnFill:rgba(18,19,24,.08);
+
+      --checkBg:rgba(18,19,24,.06);
+      --checkOn:rgba(18,19,24,.88);
+
+      --glowA:#ff3b30; --glowB:#ff9500; --glowC:#34c759; --glowD:#007aff; --glowE:#af52de;
+
+      --colonW:22px;
+      --colonDot:14px; /* 14px diameter */
+      --colonGap:10px;
+      --colonDown:10px;
+    }
+
+    [data-theme="dark"]{
+      --card:#2a2a2a; --card2:#232323;
+      --ink:#f5f7ff; --muted:#d2d6e8; --muted2:#b9bfd8;
+      --line:rgba(255,255,255,.14);
+
+      --pill:rgba(255,255,255,.08);
+      --pill2:rgba(255,255,255,.12);
+      --fill:rgba(255,255,255,.92);
+
+      --softBar:rgba(255,255,255,.22);
+      --btnFill:rgba(255,255,255,.08);
+
+      --checkBg:rgba(255,255,255,.08);
+      --checkOn:rgba(255,255,255,.92);
+    }
+
+    html,body{height:100%;margin:0;background:transparent;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--ink);}
+    .wrap{min-height:100%;display:grid;place-items:center;padding:8px;box-sizing:border-box;}
+
+    .tile{
+      width:var(--tileW);
+      height:var(--tileH);
+      position:relative;
+      border-radius:20px;
+      background:transparent;
+      overflow:visible;
+    }
+
+    /* outside glow */
+    .glow{
+      position:absolute; inset:-26px;
+      border-radius:30px;
+      background:linear-gradient(90deg,var(--glowA),var(--glowB),var(--glowC),var(--glowD),var(--glowE),var(--glowA));
+      background-size:420% 420%;
+      filter:blur(20px);
+      opacity:0;
+      pointer-events:none;
+      z-index:0;
+      transition:opacity .12s ease;
+      animation:glowShift 1.6s ease-in-out infinite, glowPulse 1.0s ease-in-out infinite;
+    }
+    .tile.celebrate .glow{opacity:.85;}
+    @keyframes glowShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+    @keyframes glowPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.012)}}
+
+    .card{
+      width:100%;height:100%;
+      border-radius:20px;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg,var(--card),var(--card2));
+      box-sizing:border-box;
+      padding:8px 12px 10px;
+      display:flex;flex-direction:column;gap:6px;
+      position:relative;
+      z-index:1;
+      overflow:hidden;
+    }
+    .card::after{
+      content:"";position:absolute;inset:0;border-radius:20px;pointer-events:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 -16px 26px rgba(0,0,0,.10);
+    }
+    .card > *{position:relative;z-index:1;}
+
+    /* topbar */
+    .topbar{display:flex;align-items:center;justify-content:space-between;height:18px;padding:0 2px;}
+    .pager{display:flex;align-items:center;gap:8px;user-select:none;}
+    .dot{width:8px;height:8px;border-radius:999px;border:1px solid var(--line);cursor:pointer;opacity:.7;background:transparent;transition:.18s;}
+    .dot.active{opacity:1;background:var(--fill);border-color:transparent;}
+
+    /* theme toggle */
+    .themeToggle{width:40px;height:18px;border-radius:999px;border:1px solid var(--line);background:var(--pill);display:flex;align-items:center;padding:2px;cursor:pointer;user-select:none;box-sizing:border-box;}
+    .themeKnob{width:14px;height:14px;border-radius:999px;background:var(--fill);display:grid;place-items:center;transition:transform .22s cubic-bezier(.2,.95,.2,1), background .18s ease;box-shadow:0 6px 12px rgba(0,0,0,.18);}
+    [data-theme="dark"] .themeKnob{background:rgba(255,255,255,.92);}
+    [data-theme="light"] .themeKnob{background:rgba(18,19,24,.86);}
+    .themeToggle[data-on="dark"] .themeKnob{transform:translateX(22px);}
+    .themeKnob svg{width:9px;height:9px;color:rgba(0,0,0,.75);}
+    [data-theme="light"] .themeKnob svg{color:rgba(255,255,255,.95);}
+
+    /* title */
+    .titleRow{display:flex;align-items:center;justify-content:center;height:16px;margin-top:-8px;margin-bottom:2px;}
+    .title{font-size:13px;letter-spacing:1.3px;font-weight:1000;color:var(--muted2);text-transform:uppercase;user-select:none;}
+
+    /* pages */
+    .pages{flex:1 1 auto;min-height:0;overflow:hidden;border-radius:16px;touch-action:pan-y;}
+    .track{width:200%;height:100%;display:flex;transform:translateX(0%);transition:transform .26s cubic-bezier(.18,.98,.18,1);will-change:transform;}
+    .page{width:50%;height:100%;box-sizing:border-box;padding:6px 4px 4px;display:flex;flex-direction:column;min-height:0;}
+
+    .content{
+      flex:1 1 auto;min-height:0;
+      display:flex;flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:2px 2px 0;
+      box-sizing:border-box;
+    }
+    .runStack{
+      width:100%;
+      display:flex;flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:10px;             /* slightly tighter */
+      padding:2px 2px 0;
+      box-sizing:border-box;
+    }
+    /* tighter only for pomodoro running to avoid pushing */
+    #pomoRun{gap:8px;}
+
+    /* ===== TIMER INPUTS (elongated ONLY for timer before start) ===== */
+    .timerInputGrid{
+      width:100%;
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:8px;
+      box-sizing:border-box;
+      align-items:stretch;
+    }
+    .timerInputCard{
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:var(--btnFill);
+      padding:2px 4px;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      gap:4px;
+      cursor:pointer;user-select:none;
+      overflow:hidden;
+      min-height:126px;
+    }
+    .timerInputCard.active{background:var(--pill2);}
+    .timerNum{
+      border:0;background:transparent;outline:none;
+      font-weight:1000;
+      font-size:30px;
+      color:var(--ink);
+      font-variant-numeric:tabular-nums;
+      line-height:1;
+      width:100%;
+      text-align:center;
+      letter-spacing:.7px;
+    }
+    .timerLbl{
+      font-size:11px;
+      font-weight:1000;
+      color:var(--muted2);
+      letter-spacing:.25px;
+      text-transform:uppercase;
+      text-align:center;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* ===== POMODORO SETUP CARDS (NOT elongated) ===== */
+    .pomoCard{
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:var(--btnFill);
+      padding:4px 6px;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      gap:4px;
+      cursor:pointer;user-select:none;
+      overflow:hidden;
+      min-height:62px;
+    }
+    .pomoCard.active{background:var(--pill2);}
+    .pomoNum{
+      border:0;background:transparent;outline:none;
+      font-weight:1000;
+      font-size:22px;
+      color:var(--ink);
+      font-variant-numeric:tabular-nums;
+      line-height:1;
+      width:100%;
+      text-align:center;
+      letter-spacing:.6px;
+    }
+    .pomoLbl{
+      font-size:9.7px;
+      font-weight:1000;
+      color:var(--muted2);
+      letter-spacing:.25px;
+      text-transform:uppercase;
+      text-align:center;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* meta row */
+    .metaRow{
+      width:100%;
+      display:flex;align-items:center;justify-content:center;gap:6px;
+      user-select:none;
+      font-size:11px;font-weight:980;color:var(--muted2);
+      min-height:14px;
+    }
+    .bell{width:12px;height:12px;color:var(--muted2);opacity:.95;transform:translateY(1px);}
+    .metaTime{color:var(--ink);font-weight:1000;}
+
+    /* dots for "colon" */
+    .dotColon{
+      width:var(--colonW);
+      height:104px;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      pointer-events:none;
+      transform:translateY(var(--colonDown));
+    }
+    /* ✅ per your request: flex number 1.1 */
+    .dotPadTop{flex:1.1;}
+    .dotPadBot{flex:1.1;}
+    .dotGap{height:var(--colonGap);}
+    .dotBall{width:var(--colonDot);height:var(--colonDot);border-radius:999px;background:var(--muted2);opacity:.95;}
+
+    /* running timers */
+    .bigWrap{
+      width:100%;
+      height:100px;            /* ✅ added */
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    }
+
+    .bigSingle{
+      width:100%;
+      height:100%;
+      display:flex;justify-content:center;align-items:center;
+      font-variant-numeric:tabular-nums;
+      font-weight:1000;
+      letter-spacing:1px;
+      line-height:1;
+      font-size:106px;
+      user-select:none;
+    }
+    .bigSingle.secondsSmall{font-size:92px;}
+
+    /* ✅ make digits vertically centered perfectly */
+    .bigDouble, .bigTriple{
+      height:100%;
+      align-items:center;
+    }
+    .bigDouble span,
+    .bigTriple span{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:100%;
+      transform:translateY(1px); /* tiny optical centering */
+    }
+
+    .bigDouble{
+      width:100%;
+      display:grid;
+      grid-template-columns: 2.1ch var(--colonW) 2.1ch;
+      justify-content:center;
+      align-items:center;
+      font-variant-numeric:tabular-nums;
+      font-weight:1000;
+      letter-spacing:1px;
+      line-height:1;
+      font-size:82px;
+      user-select:none;
+    }
+    .bigTriple{
+      width:100%;
+      display:grid;
+      grid-template-columns: 1.7ch var(--colonW) 1.7ch var(--colonW) 1.7ch;
+      justify-content:center;
+      align-items:center;
+      font-variant-numeric:tabular-nums;
+      font-weight:1000;
+      letter-spacing:.6px;
+      line-height:1;
+      font-size:58px;
+      user-select:none;
+    }
+
+    /* progress bar */
+    .progress{width:100%;height:7px;border-radius:999px;background:var(--softBar);overflow:hidden;margin-top:0;}
+    .bar{height:100%;width:0%;border-radius:999px;background:var(--fill);will-change:width;}
+
+    /* pomodoro setup */
+    .chips{width:100%;display:flex;justify-content:center;gap:10px;margin-top:2px;}
+    .chip{height:28px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font-weight:980;font-size:11px;cursor:pointer;user-select:none;}
+    .chip.active{background:var(--pill2);}
+    .miniClassic{width:100%;display:flex;justify-content:center;}
+    .classicWide{width:210px;}
+    .miniCustom{width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+
+    /* skip */
+    .skipStack{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:2px;}
+    .skipOutside{display:flex;align-items:center;gap:8px;user-select:none;cursor:pointer;white-space:nowrap;}
+    .checkSquare{width:16px;height:16px;border-radius:6px;border:1px solid var(--line);background:var(--checkBg);position:relative;}
+    .checkSquare::after{content:"";position:absolute;inset:2px;border-radius:5px;background:transparent;transition:.14s;transform:scale(.92);}
+    .skipOutside.checked .checkSquare::after{background:var(--checkOn);transform:scale(1);}
+    .checkLabel{font-size:10.5px;font-weight:980;color:var(--ink);letter-spacing:.2px;text-transform:uppercase;}
+    .breakText{font-size:10px;font-weight:1000;color:var(--muted2);letter-spacing:.2px;user-select:none;}
+
+    /* divider */
+    .divider{width:100%;height:1px;background:var(--line);border-radius:999px;opacity:.95;}
+
+    /* ✅ Pomodoro running metrics more compact to fit */
+    .infoRow{
+      width:100%;
+      display:grid;
+      grid-template-columns:1fr 1px 1fr 1px 1fr;
+      align-items:center;
+      gap:6px;
+      user-select:none;
+      margin-top:0;
+    }
+    .vline{width:1px;height:14px;background:var(--line);border-radius:999px;opacity:.95;}
+    .infoCell{text-align:center;min-width:0;}
+    .infoK{font-size:8.2px;font-weight:1000;color:var(--muted2);letter-spacing:.25px;text-transform:uppercase;margin-bottom:2px;}
+    .infoV{font-size:10.6px;font-weight:1000;color:var(--ink);letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+    /* bottom controls */
+    .bottom{display:flex;flex-direction:column;align-items:center;gap:7px;padding-top:2px;}
+    .controls{width:100%;display:flex;align-items:center;justify-content:center;gap:14px;}
+    .btnRound{width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:var(--pill);display:grid;place-items:center;cursor:pointer;user-select:none;}
+    .btnRound svg{width:18px;height:18px;color:var(--muted2);}
+    .btnPrimary{width:44px;height:44px;border-radius:999px;border:1px solid var(--line);background:var(--pill2);display:grid;place-items:center;cursor:pointer;user-select:none;box-shadow:0 7px 14px rgba(0,0,0,.10);}
+    .btnPrimary svg{width:22px;height:22px;color:var(--muted2);}
+    .resetLink{border:0;background:transparent;padding:0;margin:0;font-size:12px;font-weight:1000;color:var(--muted2);cursor:pointer;user-select:none;margin-top:-2px;}
+    .resetLink:hover{color:var(--ink);}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="tile" id="tile">
+    <div class="glow" aria-hidden="true"></div>
+
+    <div class="card">
+      <div class="topbar">
+        <div class="pager">
+          <div class="dot" id="dotTimer" title="Timer"></div>
+          <div class="dot" id="dotPomo" title="Pomodoro"></div>
+        </div>
+
+        <div class="themeToggle" id="themeToggle" data-on="dark" role="switch" aria-checked="true">
+          <div class="themeKnob">
+            <svg id="themeSvg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="titleRow">
+        <div class="title" id="pageTitle">TIMER</div>
+      </div>
+
+      <div class="pages" id="pages">
+        <div class="track" id="track">
+
+          <!-- TIMER PAGE -->
+          <div class="page">
+            <div class="content">
+
+              <!-- before start -->
+              <div class="timerInputGrid" id="timerInputs">
+                <div class="timerInputCard" id="boxHH">
+                  <input class="timerNum" id="hh" maxlength="2" inputmode="numeric" value="00"/>
+                  <div class="timerLbl">Hours</div>
+                </div>
+                <div class="timerInputCard active" id="boxMM">
+                  <input class="timerNum" id="mm" maxlength="2" inputmode="numeric" value="00"/>
+                  <div class="timerLbl">Minutes</div>
+                </div>
+                <div class="timerInputCard" id="boxSS">
+                  <input class="timerNum" id="ss" maxlength="2" inputmode="numeric" value="00"/>
+                  <div class="timerLbl">Seconds</div>
+                </div>
+              </div>
+
+              <!-- running -->
+              <div class="runStack" id="timerRun" style="display:none;">
+                <div class="metaRow" id="timerMeta">
+                  <svg class="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                          d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"/>
+                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                          d="M13.73 21a2 2 0 01-3.46 0"/>
+                  </svg>
+                  <span class="metaTime" id="timerBellTime">—</span>
+                </div>
+
+                <div class="bigWrap" id="timerBigWrap">
+                  <div class="bigSingle secondsSmall" id="timerSSOnly" style="display:none;">
+                    <span id="tS">59</span>
+                  </div>
+
+                  <div class="bigDouble" id="timerMMSS" style="display:none;">
+                    <span id="tA">00</span>
+                    <div class="dotColon" aria-hidden="true">
+                      <div class="dotPadTop"></div><div class="dotBall"></div><div class="dotGap"></div><div class="dotBall"></div><div class="dotPadBot"></div>
+                    </div>
+                    <span id="tB">00</span>
+                  </div>
+
+                  <div class="bigTriple" id="timerHHMMSS" style="display:none;">
+                    <span id="tH">00</span>
+                    <div class="dotColon" aria-hidden="true">
+                      <div class="dotPadTop"></div><div class="dotBall"></div><div class="dotGap"></div><div class="dotBall"></div><div class="dotPadBot"></div>
+                    </div>
+                    <span id="tM">00</span>
+                    <div class="dotColon" aria-hidden="true">
+                      <div class="dotPadTop"></div><div class="dotBall"></div><div class="dotGap"></div><div class="dotBall"></div><div class="dotPadBot"></div>
+                    </div>
+                    <span id="tC">00</span>
+                  </div>
+                </div>
+
+                <div class="progress">
+                  <div class="bar" id="timerBar"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- POMODORO PAGE -->
+          <div class="page">
+            <div class="content">
+
+              <!-- setup -->
+              <div id="pomoSetup" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <div class="chips">
+                  <button class="chip active" id="chipClassic" type="button">Classic</button>
+                  <button class="chip" id="chipCustom" type="button">Custom</button>
+                </div>
+
+                <div class="miniClassic" id="classicBlock">
+                  <div class="pomoCard classicWide active" id="boxRounds">
+                    <input class="pomoNum" id="roundsBig" value="4" inputmode="numeric" aria-label="Rounds"/>
+                    <div class="pomoLbl">Rounds</div>
+                  </div>
+                </div>
+
+                <div class="miniCustom" id="customBlock" style="display:none;">
+                  <div class="pomoCard active" id="boxWork">
+                    <input class="pomoNum" id="customWork" value="25" inputmode="numeric" aria-label="Work"/>
+                    <div class="pomoLbl">Work</div>
+                  </div>
+                  <div class="pomoCard" id="boxBreak">
+                    <input class="pomoNum" id="customBreak" value="5" inputmode="numeric" aria-label="Break"/>
+                    <div class="pomoLbl">Break</div>
+                  </div>
+                  <div class="pomoCard" id="boxRounds2">
+                    <input class="pomoNum" id="roundsBig2" value="4" inputmode="numeric" aria-label="Rounds"/>
+                    <div class="pomoLbl">Rounds</div>
+                  </div>
+                </div>
+
+                <div class="skipStack">
+                  <div class="skipOutside" id="skipOutside">
+                    <div class="checkSquare" role="checkbox" aria-checked="false"></div>
+                    <div class="checkLabel">SKIP BREAKS</div>
+                  </div>
+                  <div class="breakText" id="breakText">You’ll have 4 breaks</div>
+                </div>
+              </div>
+
+              <!-- running -->
+              <div class="runStack" id="pomoRun" style="display:none;">
+                <div class="metaRow">
+                  <svg class="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                          d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"/>
+                    <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                          d="M13.73 21a2 2 0 01-3.46 0"/>
+                  </svg>
+                  <span class="metaTime" id="pomoBellTime">—</span>
+                </div>
+
+                <div class="bigWrap">
+                  <div class="bigDouble" id="pomoMMSS" style="display:none;">
+                    <span id="pA">25</span>
+                    <div class="dotColon" aria-hidden="true">
+                      <div class="dotPadTop"></div><div class="dotBall"></div><div class="dotGap"></div><div class="dotBall"></div><div class="dotPadBot"></div>
+                    </div>
+                    <span id="pB">00</span>
+                  </div>
+
+                  <div class="bigTriple" id="pomoHHMMSS" style="display:none;">
+                    <span id="pH">00</span>
+                    <div class="dotColon" aria-hidden="true">
+                      <div class="dotPadTop"></div><div class="dotBall"></div><div class="dotGap"></div><div class="dotBall"></div><div class="dotPadBot"></div>
+                    </div>
+                    <span id="pM">00</span>
+                    <div class="dotColon" aria-hidden="true">
+                      <div class="dotPadTop"></div><div class="dotBall"></div><div class="dotGap"></div><div class="dotBall"></div><div class="dotPadBot"></div>
+                    </div>
+                    <span id="pS">00</span>
+                  </div>
+                </div>
+
+                <div class="progress">
+                  <div class="bar" id="pomoBar"></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="infoRow">
+                  <div class="infoCell">
+                    <div class="infoK">Current</div>
+                    <div class="infoV" id="mPhase">—</div>
+                  </div>
+                  <div class="vline" aria-hidden="true"></div>
+                  <div class="infoCell">
+                    <div class="infoK">Up next</div>
+                    <div class="infoV" id="mNext">—</div>
+                  </div>
+                  <div class="vline" aria-hidden="true"></div>
+                  <div class="infoCell">
+                    <div class="infoK">Round</div>
+                    <div class="infoV" id="mRound">—</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="divider"></div>
+
+        <div class="controls">
+          <button class="btnRound" id="minusBtn" type="button" aria-label="Minus">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
+          </button>
+
+          <button class="btnPrimary" id="startBtn" type="button" aria-label="Start/Pause">
+            <svg id="startIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+
+          <button class="btnRound" id="plusBtn" type="button" aria-label="Plus">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          </button>
+        </div>
+
+        <button class="resetLink" id="resetBtn" type="button">Reset</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= Audio ========= */
+let audioCtx=null, audioArmed=false;
+function armAudio(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+    audioArmed=true;
+  }catch(e){}
+}
+function playChime(){
+  if(!audioArmed || !audioCtx) return;
+  const t0 = audioCtx.currentTime;
+
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0.0001, t0);
+  master.gain.exponentialRampToValueAtTime(1.0, t0+0.02);
+  master.gain.exponentialRampToValueAtTime(0.0001, t0+3.0);
+  master.connect(audioCtx.destination);
+
+  const notes = [523.25, 659.25, 783.99, 987.77, 1318.51, 987.77];
+  const step = 0.16;
+
+  notes.forEach((f,i)=>{
+    const o1 = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o1.type="sine";
+    o1.frequency.setValueAtTime(f, t0);
+
+    const st = t0 + i*step;
+    const en = st + 0.28;
+    g.gain.setValueAtTime(0.0001, st);
+    g.gain.exponentialRampToValueAtTime(0.25, st+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, en);
+
+    o1.connect(g);
+    g.connect(master);
+    o1.start(st); o1.stop(en);
+  });
+}
+
+/* ========= Helpers ========= */
+const $ = (id)=>document.getElementById(id);
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const pad2=(n)=>String(n).padStart(2,"0");
+function nowMs(){ return Date.now(); }
+function formatEndTime(ts){
+  const d=new Date(ts);
+  const hr=d.getHours();
+  const mn=d.getMinutes();
+  const ampm=hr>=12?"PM":"AM";
+  const h12=((hr+11)%12)+1;
+  return `${h12}:${String(mn).padStart(2,"0")} ${ampm}`;
+}
+function partsFromMs(ms){
+  ms=Math.max(0,ms);
+  const totalSec=Math.floor(ms/1000);
+  const hh=Math.floor(totalSec/3600);
+  const mm=Math.floor((totalSec%3600)/60);
+  const ss=totalSec%60;
+  return {totalSec, hh, mm, ss};
+}
+function readInt(el, def, min, max){
+  let v=(el.value||"").replace(/\D/g,"");
+  if(v==="") v=String(def);
+  const n=clamp(parseInt(v,10)||def, min, max);
+  el.value=String(n);
+  return n;
+}
+
+/* ========= Glow ========= */
+const tile=$("tile");
+let glowTO=null;
+function celebrate(){
+  tile.classList.add("celebrate");
+  clearTimeout(glowTO);
+  glowTO=setTimeout(()=>tile.classList.remove("celebrate"), 900);
+}
+
+/* ========= State ========= */
+const KEY="notion_timer_300x300_v7";
+const state={
+  theme:"dark",
+  page:0,
+
+  t_running:false,
+  t_startedOnce:false,
+  t_targetMs:0,
+  t_endAtTs:0,
+  t_done:false,
+
+  p_mode:"classic",
+  p_rounds:4,
+  p_skip:false,
+  p_work:25,
+  p_break:5,
+  p_running:false,
+  p_startedOnce:false,
+  p_segments:[],
+  p_idx:0,
+  p_phaseStartPerf:0,
+  p_phaseRemainMs:0,
+  p_phaseTotalMs:0
+};
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function load(){ try{ const raw=localStorage.getItem(KEY); if(raw) Object.assign(state, JSON.parse(raw)); }catch(e){} }
+
+/* ========= Theme ========= */
+function setTheme(t){
+  state.theme=t;
+  document.documentElement.setAttribute("data-theme", t);
+  $("themeToggle").setAttribute("data-on", t);
+  $("themeToggle").setAttribute("aria-checked", t==="dark" ? "true" : "false");
+
+  const svg=$("themeSvg");
+  if(t==="dark"){
+    svg.innerHTML = `
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2"></path><path d="M12 20v2"></path>
+      <path d="M4.93 4.93l1.41 1.41"></path><path d="M17.66 17.66l1.41 1.41"></path>
+      <path d="M2 12h2"></path><path d="M20 12h2"></path>
+      <path d="M4.93 19.07l1.41-1.41"></path><path d="M17.66 6.34l1.41-1.41"></path>
+    `;
+  }else{
+    svg.innerHTML = `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>`;
+  }
+  save();
+}
+$("themeToggle").addEventListener("click", ()=>{ armAudio(); setTheme(state.theme==="dark" ? "light" : "dark"); });
+
+/* ========= Pager ========= */
+const track=$("track");
+function setDotActive(){
+  $("dotTimer").classList.toggle("active", state.page===0);
+  $("dotPomo").classList.toggle("active", state.page===1);
+}
+function setPage(idx, animate=true){
+  state.page=idx;
+  $("pageTitle").textContent = idx===0 ? "TIMER" : "POMODORO";
+  track.style.transition = animate ? "transform .26s cubic-bezier(.18,.98,.18,1)" : "none";
+  track.style.transform = `translateX(${-50*idx}%)`;
+  setDotActive();
+  save();
+}
+$("dotTimer").addEventListener("click", ()=>setPage(0,true));
+$("dotPomo").addEventListener("click", ()=>setPage(1,true));
+
+/* ========= Timer ========= */
+function sanitizeTimerInput(el, max){
+  let v=(el.value||"").replace(/\D/g,"");
+  if(v==="") v="0";
+  const n=clamp(parseInt(v,10)||0,0,max);
+  el.value=pad2(n);
+}
+$("hh").addEventListener("input", e=>sanitizeTimerInput(e.target,99));
+$("mm").addEventListener("input", e=>sanitizeTimerInput(e.target,59));
+$("ss").addEventListener("input", e=>sanitizeTimerInput(e.target,59));
+
+function toMsFromInputs(){
+  const hh=clamp(parseInt($("hh").value||"0",10)||0,0,99);
+  const mm=clamp(parseInt($("mm").value||"0",10)||0,0,59);
+  const ss=clamp(parseInt($("ss").value||"0",10)||0,0,59);
+  return (hh*3600 + mm*60 + ss)*1000;
+}
+
+let t_tick=null;
+let t_endPerf=0;
+
+function stopTimerTick(){ if(t_tick){ clearInterval(t_tick); t_tick=null; } }
+
+function startTimerTickLoop(){
+  stopTimerTick();
+  t_tick = setInterval(()=>{
+    if(!state.t_running) return;
+    const remain = Math.max(0, t_endPerf - performance.now());
+    if(remain <= 0){
+      state.t_running = false;
+      state.t_done = true;
+      state.t_targetMs = 0;
+      state.t_endAtTs = 0;
+      stopTimerTick();
+      playChime(); celebrate();
+      save();
+    }
+  }, 100);
+}
+
+function startTimer(){
+  armAudio();
+
+  if(state.t_startedOnce && state.t_done && state.t_targetMs>0){
+    state.t_endAtTs = nowMs() + state.t_targetMs;
+    t_endPerf = performance.now() + state.t_targetMs;
+    state.t_running = true;
+    state.t_done = false;
+    startTimerTickLoop();
+    save();
+    return;
+  }
+
+  if(!state.t_startedOnce){
+    const target = toMsFromInputs();
+    state.t_targetMs = target;
+    state.t_startedOnce = true;
+  }
+
+  if(state.t_targetMs <= 0){
+    state.t_startedOnce = false;
+    save();
+    return;
+  }
+
+  state.t_endAtTs = nowMs() + state.t_targetMs;
+  t_endPerf = performance.now() + state.t_targetMs;
+  state.t_running = true;
+  state.t_done = false;
+
+  startTimerTickLoop();
+  save();
+}
+
+function pauseTimer(){
+  if(!state.t_running) return;
+  const remain = Math.max(0, t_endPerf - performance.now());
+  state.t_targetMs = remain;
+  state.t_endAtTs = nowMs() + remain;
+  state.t_running = false;
+  stopTimerTick();
+  save();
+}
+
+function adjustTimer(delta){
+  if(state.t_running || state.t_startedOnce) return;
+  let hh=parseInt($("hh").value,10)||0;
+  let mm=parseInt($("mm").value,10)||0;
+  let ss=parseInt($("ss").value,10)||0;
+  mm = clamp(mm+delta,0,59);
+  $("hh").value=pad2(clamp(hh,0,99));
+  $("mm").value=pad2(mm);
+  $("ss").value=pad2(clamp(ss,0,59));
+}
+
+/* ========= Pomodoro ========= */
+function stopPomo(clear){
+  state.p_running=false;
+  if(clear){
+    state.p_startedOnce=false;
+    state.p_segments=[];
+    state.p_idx=0;
+    state.p_phaseRemainMs=0;
+    state.p_phaseTotalMs=0;
+  }
+  save();
+}
+
+function buildSegments(rounds, workMin, breakMin, skip){
+  rounds = clamp(rounds, 1, 50);
+  workMin = clamp(workMin, 1, 999);
+  breakMin = clamp(breakMin, 0, 240);
+  const seg=[];
+  for(let r=1;r<=rounds;r++){
+    seg.push({type:"work", ms:workMin*60*1000, round:r, rounds});
+    if(!skip && breakMin>0) seg.push({type:"break", ms:breakMin*60*1000, round:r, rounds});
+  }
+  return seg;
+}
+function pomoConfig(){
+  const rounds = clamp(state.p_rounds, 1, 50);
+  const skip = !!state.p_skip;
+  const work = (state.p_mode==="classic") ? 25 : clamp(state.p_work,1,999);
+  const brk  = (state.p_mode==="classic") ? 5  : clamp(state.p_break,0,240);
+  return {rounds, skip, work, brk};
+}
+function updateBreakText(){
+  const {rounds, skip} = pomoConfig();
+  const breaks = skip ? 0 : rounds;
+  $("breakText").textContent = skip ? "You’ll have 0 breaks" : `You’ll have ${breaks} break${breaks===1?"":"s"}`;
+}
+function updateSkipUI(){
+  $("skipOutside").classList.toggle("checked", state.p_skip);
+  $("skipOutside").querySelector(".checkSquare").setAttribute("aria-checked", state.p_skip ? "true" : "false");
+}
+function updatePomoSetupUI(){
+  $("chipClassic").classList.toggle("active", state.p_mode==="classic");
+  $("chipCustom").classList.toggle("active", state.p_mode==="custom");
+  $("classicBlock").style.display = state.p_mode==="classic" ? "flex" : "none";
+  $("customBlock").style.display  = state.p_mode==="custom"  ? "grid" : "none";
+
+  $("roundsBig").value = String(state.p_rounds);
+  $("roundsBig2").value = String(state.p_rounds);
+  $("customWork").value = String(state.p_work);
+  $("customBreak").value = String(state.p_break);
+
+  updateBreakText();
+  updateSkipUI();
+}
+
+let p_tick=null;
+function stopPomoTick(){ if(p_tick){ clearInterval(p_tick); p_tick=null; } }
+
+function startPhase(idx){
+  const seg = state.p_segments[idx];
+  if(!seg) return false;
+  state.p_idx = idx;
+  state.p_phaseTotalMs = seg.ms;
+  state.p_phaseRemainMs = seg.ms;
+  state.p_phaseStartPerf = performance.now();
+  return true;
+}
+
+function startPomo(){
+  armAudio();
+
+  if(state.p_segments.length===0){
+    const {rounds, skip, work, brk} = pomoConfig();
+    state.p_segments = buildSegments(rounds, work, brk, skip);
+    startPhase(0);
+  }else{
+    state.p_phaseStartPerf = performance.now();
+  }
+
+  state.p_startedOnce=true;
+  state.p_running=true;
+
+  stopPomoTick();
+  p_tick = setInterval(()=>{
+    if(!state.p_running) return;
+
+    const elapsed = performance.now() - state.p_phaseStartPerf;
+    const remain = Math.max(0, state.p_phaseRemainMs - elapsed);
+
+    if(remain <= 0){
+      playChime(); celebrate();
+
+      const next = state.p_idx + 1;
+      if(next >= state.p_segments.length){
+        state.p_running=false;
+        stopPomo(true);
+        stopPomoTick();
+        return;
+      }
+      startPhase(next);
+      save();
+      return;
+    }
+  }, 120);
+
+  save();
+}
+
+function pausePomo(){
+  if(!state.p_running) return;
+  const elapsed = performance.now() - state.p_phaseStartPerf;
+  state.p_phaseRemainMs = Math.max(0, state.p_phaseRemainMs - elapsed);
+  state.p_phaseStartPerf = 0;
+  state.p_running=false;
+  stopPomoTick();
+  save();
+}
+
+function setRounds(n){ state.p_rounds = clamp(n, 1, 50); stopPomo(true); }
+function setWork(n){ state.p_work = clamp(n, 1, 999); stopPomo(true); }
+function setBreak(n){ state.p_break = clamp(n, 0, 240); stopPomo(true); }
+
+/* ========= Controls ========= */
+$("minusBtn").addEventListener("click", ()=>{
+  armAudio();
+  if(state.page===0){ adjustTimer(-1); return; }
+  if(state.p_running || state.p_startedOnce) return;
+
+  if(state.p_mode==="classic"){ setRounds(state.p_rounds-1); return; }
+  setWork(state.p_work-1);
+});
+$("plusBtn").addEventListener("click", ()=>{
+  armAudio();
+  if(state.page===0){ adjustTimer(+1); return; }
+  if(state.p_running || state.p_startedOnce) return;
+
+  if(state.p_mode==="classic"){ setRounds(state.p_rounds+1); return; }
+  setWork(state.p_work+1);
+});
+
+$("startBtn").addEventListener("click", ()=>{
+  armAudio();
+  if(state.page===0) (state.t_running ? pauseTimer() : startTimer());
+  else (state.p_running ? pausePomo() : startPomo());
+});
+$("resetBtn").addEventListener("click", ()=>{
+  armAudio();
+  if(state.page===0){
+    stopTimerTick();
+    state.t_running=false;
+    state.t_startedOnce=false;
+    state.t_targetMs=0;
+    state.t_endAtTs=0;
+    state.t_done=false;
+    $("hh").value="00"; $("mm").value="00"; $("ss").value="00";
+    save();
+  }else{
+    stopPomo(true);
+    stopPomoTick();
+  }
+});
+
+/* Pomodoro setup interactions */
+$("chipClassic").addEventListener("click", ()=>{
+  armAudio();
+  if(state.p_running || state.p_startedOnce) return;
+  state.p_mode="classic";
+  stopPomo(true);
+});
+$("chipCustom").addEventListener("click", ()=>{
+  armAudio();
+  if(state.p_running || state.p_startedOnce) return;
+  state.p_mode="custom";
+  stopPomo(true);
+});
+
+$("roundsBig").addEventListener("input", ()=>{ if(state.p_running||state.p_startedOnce) return; setRounds(readInt($("roundsBig"), state.p_rounds, 1, 50)); });
+$("roundsBig2").addEventListener("input", ()=>{ if(state.p_running||state.p_startedOnce) return; setRounds(readInt($("roundsBig2"), state.p_rounds, 1, 50)); });
+$("customWork").addEventListener("input", ()=>{ if(state.p_running||state.p_startedOnce) return; setWork(readInt($("customWork"), state.p_work, 1, 999)); });
+$("customBreak").addEventListener("input", ()=>{ if(state.p_running||state.p_startedOnce) return; setBreak(readInt($("customBreak"), state.p_break, 0, 240)); });
+
+$("skipOutside").addEventListener("click", ()=>{
+  armAudio();
+  if(state.p_running || state.p_startedOnce) return;
+  state.p_skip = !state.p_skip;
+  stopPomo(true);
+});
+
+/* ========= Render ========= */
+function showTimerVariant(kind){
+  $("timerSSOnly").style.display = (kind==="ss") ? "flex" : "none";
+  $("timerMMSS").style.display   = (kind==="mmss") ? "grid" : "none";
+  $("timerHHMMSS").style.display = (kind==="hhmmss") ? "grid" : "none";
+}
+function showPomoVariant(kind){
+  $("pomoMMSS").style.display   = (kind==="mmss") ? "grid" : "none";
+  $("pomoHHMMSS").style.display = (kind==="hhmmss") ? "grid" : "none";
+}
+
+function renderTimer(){
+  const inputs=$("timerInputs");
+  const run=$("timerRun");
+  const bar=$("timerBar");
+
+  if(!state.t_startedOnce){
+    inputs.style.display="grid";
+    run.style.display="none";
+    bar.style.width="0%";
+    return;
+  }
+
+  inputs.style.display="none";
+  run.style.display="flex";
+
+  const remainMs = state.t_running ? Math.max(0, t_endPerf - performance.now()) : state.t_targetMs;
+  $("timerBellTime").textContent = state.t_running
+    ? formatEndTime(state.t_endAtTs)
+    : (state.t_done ? "—" : formatEndTime(state.t_endAtTs || (nowMs()+remainMs)));
+
+  const p = partsFromMs(remainMs);
+
+  if(p.totalSec < 60){
+    showTimerVariant("ss");
+    $("tS").textContent = String(p.totalSec);
+  }else if(p.hh >= 1){
+    showTimerVariant("hhmmss");
+    $("tH").textContent=pad2(p.hh);
+    $("tM").textContent=pad2(p.mm);
+    $("tC").textContent=pad2(p.ss);
+  }else{
+    showTimerVariant("mmss");
+    $("tA").textContent=pad2(p.mm);
+    $("tB").textContent=pad2(p.ss);
+  }
+
+  const pct = state.t_done ? 100 : clamp(((state.t_targetMs - remainMs) / Math.max(1, state.t_targetMs)) * 100, 0, 100);
+  bar.style.width = pct + "%";
+}
+
+function renderPomo(){
+  updatePomoSetupUI();
+
+  const setup=$("pomoSetup");
+  const run=$("pomoRun");
+  const bar=$("pomoBar");
+
+  if(!state.p_startedOnce){
+    setup.style.display="flex";
+    run.style.display="none";
+    bar.style.width="0%";
+    return;
+  }
+
+  setup.style.display="none";
+  run.style.display="flex";
+
+  const seg = state.p_segments[state.p_idx];
+  if(!seg){ stopPomo(true); return; }
+
+  const elapsed = state.p_running ? (performance.now() - state.p_phaseStartPerf) : 0;
+  const remain = state.p_running ? Math.max(0, state.p_phaseRemainMs - elapsed) : state.p_phaseRemainMs;
+
+  const totalRemainMs = state.p_segments.reduce((acc,s,idx)=>{
+    if(idx < state.p_idx) return acc;
+    if(idx === state.p_idx) return acc + remain;
+    return acc + s.ms;
+  }, 0);
+  $("pomoBellTime").textContent = totalRemainMs>0 ? formatEndTime(nowMs()+totalRemainMs) : "—";
+
+  const p = partsFromMs(remain);
+  if(p.hh >= 1){
+    showPomoVariant("hhmmss");
+    $("pH").textContent=pad2(p.hh);
+    $("pM").textContent=pad2(p.mm);
+    $("pS").textContent=pad2(p.ss);
+  }else{
+    showPomoVariant("mmss");
+    $("pA").textContent=pad2(p.mm);
+    $("pB").textContent=pad2(p.ss);
+  }
+
+  bar.style.width = clamp(((state.p_phaseTotalMs - remain) / Math.max(1,state.p_phaseTotalMs)) * 100, 0, 100) + "%";
+
+  const nxt = state.p_segments[state.p_idx+1] || null;
+  $("mPhase").textContent = seg.type==="work" ? "Work" : "Break";
+  $("mNext").textContent  = nxt ? (nxt.type==="break" ? "Break" : "Work") : "Finish";
+  $("mRound").textContent = `${seg.round}/${seg.rounds}`;
+}
+
+function renderAll(){
+  $("pageTitle").textContent = state.page===0 ? "TIMER" : "POMODORO";
+  setDotActive();
+
+  const running = (state.page===0 ? state.t_running : state.p_running);
+  $("startIcon").innerHTML = running
+    ? `<path d="M6 5h4v14H6z"/><path d="M14 5h4v14h-4z"/>`
+    : `<path d="M8 5v14l11-7z"/>`;
+
+  renderTimer();
+  renderPomo();
+}
+
+(function init(){
+  load();
+  setTheme(state.theme || "dark");
+  setPage(state.page===1 ? 1 : 0, false);
+  setDotActive();
+
+  document.addEventListener("pointerdown", armAudio, {once:false});
+
+  if(state.t_running){ state.t_running=false; stopTimerTick(); }
+  if(state.p_running){ state.p_running=false; stopPomoTick(); }
+
+  (function loop(){ renderAll(); requestAnimationFrame(loop); })();
+})();
+</script>
+</body>
+</html>
